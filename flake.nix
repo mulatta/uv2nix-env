@@ -67,10 +67,16 @@
       };
     in
     {
-      # Public API: the env builder + the raw overrides overlay.
+      # Public API: the env builder + the raw per-concern fixup overlays
+      # (each `{ lib; pkgs; cuda; } -> final: prev: {…}`) for manual composition.
       lib = {
         inherit mkPyEnv;
-        overrides = import ./lib/overrides.nix;
+        overlays = {
+          cuda = import ./overlays/cuda.nix;
+          jax = import ./overlays/jax.nix;
+          torch = import ./overlays/torch.nix;
+          wheels = import ./overlays/wheels.nix;
+        };
       };
 
       # Light end-to-end self-check: build the example workspace's venv.

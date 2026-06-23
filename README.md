@@ -17,8 +17,10 @@ CLI tools (foldseek, gemme, …). Rule of thumb:
 
 ## Public API
 
-- `lib.mkPyEnv` — build a virtual env from a uv workspace.
-- `lib.overrides` — the raw scope overlay (`{ lib, pkgs, cuda } -> final: prev:`).
+- `lib.mkPyEnv` — build a virtual env from a uv workspace (composes all overlays
+  below + the CUDA/JAX runtime wiring).
+- `lib.overlays.{cuda,torch,jax,wheels}` — the raw per-concern fixup overlays
+  (each `{ lib, pkgs, cuda } -> final: prev:`) for manual composition.
 
 ## Usage in a project
 
@@ -55,8 +57,18 @@ fixups are inherited from here.
 
 ## Extending the overrides
 
-`lib/overrides.nix` lists the binary wheels that get RPATH-patched. Add the ML
-packages your stack needs; over-listing a pure wheel is a harmless no-op.
+Fixups are split by concern under `overlays/` (each composed by `mkPyEnv`):
+
+- `cuda.nix` — `nvidia-*` CUDA runtime wheels (shared GPU base)
+- `torch.nix` — PyTorch ecosystem
+- `jax.nix` — JAX + its `jax-cuda*` plugin wheels
+- `wheels.nix` — generic binary wheels (numpy/scipy)
+
+`lib/patch.nix` is the shared autoPatchelf + driver-runpath helper. To support a
+new stack (e.g. RAPIDS), add an `overlays/<name>.nix` and list it in
+`lib/mk-py-env.nix`. Over-matching a pure wheel is a harmless no-op. Note these
+fixups are generic ML/CUDA — not bioinformatics-specific; bio-only patches would
+go in a future `overlays/bio.nix`.
 
 ## Self-check
 

@@ -5,10 +5,18 @@
   pyproject-build-systems,
 }:
 # mkPyEnv: turn a uv workspace (pyproject.toml + uv.lock) into a Nix virtual env,
-# composing build-system fixups + the workspace overlay + the shared overrides +
-# any project-specific overrides. This is the ~one function every project reuses.
+# composing build-system fixups + the workspace overlay + our per-concern fixup
+# overlays + any project-specific overrides. This is the ~one function every
+# project reuses.
 let
-  mkOverrides = import ./overrides.nix;
+  # Per-concern fixup overlays (see overlays/). Each is `{ lib; pkgs; cuda; } ->
+  # final: prev: {…}` and touches a disjoint set of packages, so order is moot.
+  concernOverlays = [
+    ../overlays/wheels.nix
+    ../overlays/cuda.nix
+    ../overlays/torch.nix
+    ../overlays/jax.nix
+  ];
 in
 {
   pkgs,
@@ -28,18 +36,20 @@ let
   workspaceOverlay = workspace.mkPyprojectOverlay { inherit sourcePreference; };
 
   pythonSet = (pkgs.callPackage pyproject-nix.build.packages { inherit python; }).overrideScope (
-    lib.composeManyExtensions [
-      pyproject-build-systems.overlays.default
-      workspaceOverlay
-      (mkOverrides { inherit lib pkgs cuda; })
-      overrides
-    ]
+    lib.composeManyExtensions (
+      [
+        pyproject-build-systems.overlays.default
+        workspaceOverlay
+      ]
+      ++ map (o: import o { inherit lib pkgs cuda; }) concernOverlays
+      ++ [ overrides ]
+    )
   );
 
   venv = pythonSet.mkVirtualEnv name workspace.deps.default;
 in
-# torch resolves its CUDA libs via RPATH (handled in overrides.nix), but JAX
-# resolves them via LD_LIBRARY_PATH at runtime. Under cuda, wrap python so the
+# torch resolves its CUDA libs via RPATH (the overlays add the driver runpath),
+# but JAX resolves them via LD_LIBRARY_PATH at runtime. Under cuda, wrap python so the
 # nvidia wheel lib dirs + the host driver are on the loader path. Harmless for
 # torch (additive). Non-CUDA envs are returned unwrapped.
 if !cuda then
