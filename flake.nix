@@ -60,17 +60,25 @@
         }
       );
 
-      # The reusable bits projects import.
-      mkPyEnv = import ./lib/mk-py-env.nix {
+      # The reusable bits projects import. mkWorkspace is the core (returns
+      # { workspace; pythonSet; python; venv; devShell; }); the others are aliases.
+      mkWorkspace = import ./lib/mk-workspace.nix {
         inherit (nixpkgs) lib;
-        inherit uv2nix pyproject-nix pyproject-build-systems;
+        inherit
+          nixpkgs
+          uv2nix
+          pyproject-nix
+          pyproject-build-systems
+          ;
       };
+      mkPyEnv = args: (mkWorkspace args).venv;
+      mkDevShell = args: (mkWorkspace args).devShell;
     in
     {
-      # Public API: the env builder + the raw per-concern fixup overlays
+      # Public API: the env builders + the raw per-concern fixup overlays
       # (each `{ lib; pkgs; cuda; } -> final: prev: {…}`) for manual composition.
       lib = {
-        inherit mkPyEnv;
+        inherit mkWorkspace mkPyEnv mkDevShell;
         overlays = {
           cuda = import ./overlays/cuda.nix;
           jax = import ./overlays/jax.nix;

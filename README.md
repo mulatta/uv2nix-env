@@ -17,10 +17,19 @@ CLI tools (foldseek, gemme, …). Rule of thumb:
 
 ## Public API
 
-- `lib.mkPyEnv` — build a virtual env from a uv workspace (composes all overlays
-  below + the CUDA/JAX runtime wiring).
+- `lib.mkWorkspace` — load a uv workspace once; returns
+  `{ workspace; pythonSet; python; venv; devShell; }` (one resolved set shared by
+  all outputs). `venv` is the **pure** locked env; `devShell` is the **editable**
+  interactive shell (impure — uses `$REPO_ROOT`).
+- `lib.mkPyEnv` = `args: (mkWorkspace args).venv` — convenience for the venv.
+- `lib.mkDevShell` = `args: (mkWorkspace args).devShell` — convenience for the shell.
 - `lib.overlays.{cuda,torch,jax,wheels}` — the raw per-concern fixup overlays
   (each `{ lib, pkgs, cuda } -> final: prev:`) for manual composition.
+
+All builders accept either `pkgs` or `system` (with `system`, `pkgs` is built
+from this flake's nixpkgs with `allowUnfree`). So a project needs **only the
+`py-overrides` input** — `uv2nix`/`pyproject-nix`/`pyproject-build-systems` are
+inherited transitively.
 
 ## Usage in a project
 
@@ -28,18 +37,12 @@ CLI tools (foldseek, gemme, …). Rule of thumb:
 # <project>/flake.nix
 {
   inputs.py-overrides.url = "github:mulatta/bioinformatics-py-overrides";
-  inputs.nixpkgs.follows = "py-overrides/nixpkgs";
 
   outputs =
-    { nixpkgs, py-overrides, ... }:
+    { py-overrides, ... }:
     let
-      system = "x86_64-linux";
-      pkgs = import nixpkgs {
-        inherit system;
-        config.allowUnfree = true; # for CUDA
-      };
-      env = py-overrides.lib.mkPyEnv {
-        inherit pkgs;
+      ws = py-overrides.lib.mkWorkspace {
+        system = "x86_64-linux";
         workspaceRoot = ./.; # pyproject.toml + uv.lock
         cuda = true;
         # project-specific long-tail patches, if any:
@@ -47,13 +50,18 @@ CLI tools (foldseek, gemme, …). Rule of thumb:
       };
     in
     {
-      devShells.${system}.default = pkgs.mkShellNoCC { packages = [ env ]; };
+      packages.x86_64-linux.default = ws.venv; # pure, run/package
+      devShells.x86_64-linux.default = ws.devShell; # editable dev
     };
 }
 ```
 
 Each project keeps only its `uv.lock` and a thin flake; the heavy wheel/CUDA
 fixups are inherited from here.
+
+> Editable dev shells (`devShell`) need a build backend that supports editable
+> installs natively — **`uv_build`** is recommended (hatchling additionally needs
+> the `editables` build dep). The pure `venv` works with any backend.
 
 ## Extending the overrides
 
