@@ -32,6 +32,20 @@ from this flake's nixpkgs with `allowUnfree`). So a project needs **only the
 `uv2nix-env` input** — `uv2nix`/`pyproject-nix`/`pyproject-build-systems` are
 inherited transitively.
 
+## Quick start (templates)
+
+Scaffold a project (these also serve as worked per-stack examples):
+
+```bash
+nix flake init -t github:mulatta/uv2nix-env#default   # CPU (numpy)
+nix flake init -t github:mulatta/uv2nix-env#torch     # PyTorch + CUDA
+nix flake init -t github:mulatta/uv2nix-env#jax       # JAX + CUDA (+ dm-haiku)
+nix flake init -t github:mulatta/uv2nix-env#rapids    # RAPIDS cudf + CUDA
+```
+
+Then `uv add <deps>` / `uv lock`, and `nix build` (venv) or `nix develop`
+(editable devShell).
+
 ## Usage in a project
 
 ```nix

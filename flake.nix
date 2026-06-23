@@ -88,6 +88,22 @@
         };
       };
 
+      # Project scaffolds (also serve as worked examples per stack):
+      #   nix flake init -t github:mulatta/uv2nix-env#<name>
+      templates =
+        let
+          mk = name: desc: {
+            path = ./templates/${name};
+            description = desc;
+          };
+        in
+        {
+          default = mk "default" "uv2nix-env Python project (CPU; pure venv + editable devShell)";
+          torch = mk "torch" "PyTorch (CUDA) project using uv2nix-env";
+          jax = mk "jax" "JAX (CUDA) + DeepMind project using uv2nix-env";
+          rapids = mk "rapids" "RAPIDS cudf (CUDA) project using uv2nix-env";
+        };
+
       # Light end-to-end self-check: build the example workspace's venv.
       packages = eachSystem (
         { pkgs, ... }:
