@@ -19,6 +19,7 @@ let
     ../overlays/cuda.nix
     ../overlays/torch.nix
     ../overlays/jax.nix
+    ../overlays/rapids.nix
   ];
 in
 {
