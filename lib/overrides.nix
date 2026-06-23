@@ -33,29 +33,21 @@ let
       }
     );
 
-  # Binary wheels that commonly need RPATH fixing. Extend per the ML stack you
-  # use; over-listing a pure wheel is harmless (autoPatchelf is then a no-op).
-  binaryWheels = [
+  # Wheels that ship prebuilt ELF and need RPATH fixing: every CUDA runtime wheel
+  # (nvidia-*, whose suffix varies by CUDA version — -cu12 / -cu13 / none) plus
+  # the frameworks. Prefix-matching is robust to those renames; over-matching a
+  # pure wheel is a harmless no-op. Extend `frameworks` per your stack.
+  frameworks = [
     "numpy"
+    "scipy"
     "torch"
     "torchvision"
     "torchaudio"
     "jax"
     "jaxlib"
-    "nvidia-cublas-cu12"
-    "nvidia-cuda-cupti-cu12"
-    "nvidia-cuda-nvrtc-cu12"
-    "nvidia-cuda-runtime-cu12"
-    "nvidia-cudnn-cu12"
-    "nvidia-cufft-cu12"
-    "nvidia-curand-cu12"
-    "nvidia-cusolver-cu12"
-    "nvidia-cusparse-cu12"
-    "nvidia-nccl-cu12"
-    "nvidia-nvjitlink-cu12"
-    "nvidia-nvtx-cu12"
   ];
 
-  present = builtins.filter (n: builtins.hasAttr n prev) binaryWheels;
+  isTarget = n: lib.hasPrefix "nvidia-" n || builtins.elem n frameworks;
+  present = builtins.filter isTarget (builtins.attrNames prev);
 in
 lib.genAttrs present (n: patch prev.${n} [ ])
