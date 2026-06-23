@@ -23,8 +23,9 @@ CLI tools (foldseek, gemme, …). Rule of thumb:
   interactive shell (impure — uses `$REPO_ROOT`).
 - `lib.mkPyEnv` = `args: (mkWorkspace args).venv` — convenience for the venv.
 - `lib.mkDevShell` = `args: (mkWorkspace args).devShell` — convenience for the shell.
-- `lib.overlays.{cuda,torch,jax,wheels}` — the raw per-concern fixup overlays
-  (each `{ lib, pkgs, cuda } -> final: prev:`) for manual composition.
+- `lib.concerns.{cuda,torch,jax,rapids,wheels}` — the raw per-concern rule
+  modules (each `{ lib, pkgs, cuda } -> { matches; patch; }`) that mkWorkspace
+  composes into a single overlay.
 
 All builders accept either `pkgs` or `system` (with `system`, `pkgs` is built
 from this flake's nixpkgs with `allowUnfree`). So a project needs **only the
@@ -65,18 +66,23 @@ fixups are inherited from here.
 
 ## Extending the overrides
 
-Fixups are split by concern under `overlays/` (each composed by `mkPyEnv`):
+Fixups are split by concern under `overlays/`. Each file is a declarative rule
+`{ lib, pkgs, cuda } -> { matches = name -> bool; patch = name -> drv -> drv'; }`;
+`lib/apply-concerns.nix` composes them into one overlay (single `attrNames`
+pass), and `lib/patch.nix` is the shared autoPatchelf + driver-runpath helper.
 
 - `cuda.nix` — `nvidia-*` CUDA runtime wheels (shared GPU base)
 - `torch.nix` — PyTorch ecosystem
 - `jax.nix` — JAX + its `jax-cuda*` plugin wheels
-- `wheels.nix` — generic binary wheels (numpy/scipy)
+- `rapids.nix` — cudf/cugraph/rmm/raft/ucxx/kvikio family
+- `wheels.nix` — generic binary wheels (numpy/scipy/numba/cupy), with per-package
+  extra buildInputs
 
-`lib/patch.nix` is the shared autoPatchelf + driver-runpath helper. To support a
-new stack (e.g. RAPIDS), add an `overlays/<name>.nix` and list it in
-`lib/mk-py-env.nix`. Over-matching a pure wheel is a harmless no-op. Note these
-fixups are generic ML/CUDA — not bioinformatics-specific; bio-only patches would
-go in a future `overlays/bio.nix`.
+To support a new stack, add `overlays/<name>.nix` and list it in
+`concernModules` (`lib/mk-workspace.nix`). Matchers are name-based — prefer
+specific roots over bare generic words to avoid false positives (harmless no-ops,
+but noise). These fixups are generic ML/CUDA — not bioinformatics-specific;
+bio-only patches would go in a future `overlays/bio.nix`.
 
 ## Self-check
 

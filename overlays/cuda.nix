@@ -3,12 +3,13 @@
   pkgs,
   cuda ? false,
 }:
-# CUDA runtime wheels (nvidia-*; the suffix varies by CUDA major: -cu12 / -cu13 /
-# none). These are the shared GPU base that torch and jax both depend on.
+# CUDA runtime wheels (nvidia-*; suffix varies by CUDA major: -cu12 / -cu13 /
+# none). The shared GPU base that torch/jax/rapids all depend on.
+# Concern rule: { matches = name -> bool; patch = name -> drv -> drv'; }
 let
-  patch = import ../lib/patch.nix { inherit lib pkgs cuda; };
+  basePatch = import ../lib/patch.nix { inherit lib pkgs cuda; };
 in
-_final: prev:
-lib.genAttrs (builtins.filter (lib.hasPrefix "nvidia-") (builtins.attrNames prev)) (
-  n: patch prev.${n} [ ]
-)
+{
+  matches = lib.hasPrefix "nvidia-";
+  patch = _name: drv: basePatch drv [ ];
+}

@@ -13,8 +13,9 @@
 #              mirroring uv2nix's own hello-world template split.
 # mkPyEnv / mkDevShell (flake.nix) are thin aliases onto .venv / .devShell.
 let
-  # Per-concern fixup overlays; each touches a disjoint set, so order is moot.
-  concernOverlays = [
+  # Per-concern rule modules ({ matches; patch; }); applied as one overlay
+  # (single attrNames pass) by lib/apply-concerns.nix.
+  concernModules = [
     ../overlays/wheels.nix
     ../overlays/cuda.nix
     ../overlays/torch.nix
@@ -43,14 +44,15 @@ let
   workspaceOverlay = workspace.mkPyprojectOverlay { inherit sourcePreference; };
 
   pythonSet = (pkgs.callPackage pyproject-nix.build.packages { inherit python; }).overrideScope (
-    lib.composeManyExtensions (
-      [
-        pyproject-build-systems.overlays.default
-        workspaceOverlay
-      ]
-      ++ map (o: import o { inherit lib pkgs cuda; }) concernOverlays
-      ++ [ overrides ]
-    )
+    lib.composeManyExtensions [
+      pyproject-build-systems.overlays.default
+      workspaceOverlay
+      (import ../lib/apply-concerns.nix {
+        inherit lib pkgs cuda;
+        modules = concernModules;
+      })
+      overrides
+    ]
   );
 
   # torch finds CUDA libs via RPATH, but JAX resolves them via LD_LIBRARY_PATH at

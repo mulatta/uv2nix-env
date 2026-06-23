@@ -75,13 +75,14 @@
       mkDevShell = args: (mkWorkspace args).devShell;
     in
     {
-      # Public API: the env builders + the raw per-concern fixup overlays
-      # (each `{ lib; pkgs; cuda; } -> final: prev: {…}`) for manual composition.
+      # Public API: the env builders + the raw per-concern rule modules
+      # (each `{ lib; pkgs; cuda; } -> { matches; patch; }`) for manual use.
       lib = {
         inherit mkWorkspace mkPyEnv mkDevShell;
-        overlays = {
+        concerns = {
           cuda = import ./overlays/cuda.nix;
           jax = import ./overlays/jax.nix;
+          rapids = import ./overlays/rapids.nix;
           torch = import ./overlays/torch.nix;
           wheels = import ./overlays/wheels.nix;
         };
