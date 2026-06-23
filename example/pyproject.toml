@@ -1,7 +1,7 @@
 [project]
 name = "example"
 version = "0.1.0"
-description = "Self-check workspace for bioinformatics-py-overrides (light binary wheel)"
+description = "Self-check workspace for uv2nix-env (light binary wheel)"
 requires-python = ">=3.11"
 # numpy is a prebuilt binary wheel -> exercises the autoPatchelf override path
 # (overrides.nix), while staying CPU-only and fast.

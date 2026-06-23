@@ -1,5 +1,5 @@
 {
-  description = "uv2nix python overrides for bioinformatics libraries";
+  description = "Build uv2nix Python environments (CUDA/native fixups handled)";
 
   inputs = {
     # keep-sorted start

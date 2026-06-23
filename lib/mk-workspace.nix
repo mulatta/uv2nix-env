@@ -26,7 +26,7 @@ in
 {
   # Provide `pkgs` directly, or `system` to build it from this flake's nixpkgs
   # (allowUnfree on for CUDA). Passing `pkgs` lets a project share its own
-  # nixpkgs (ideally `follows = "py-overrides/nixpkgs"` to stay consistent).
+  # nixpkgs (ideally `follows = "uv2nix-env/nixpkgs"` to stay consistent).
   system ? null,
   pkgs ? import nixpkgs {
     inherit system;

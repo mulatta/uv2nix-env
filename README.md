@@ -1,8 +1,8 @@
-# bioinformatics-py-overrides
+# uv2nix-env
 
-Shared [uv2nix](https://github.com/pyproject-nix/uv2nix) overrides and an env
-builder for GPU/ML Python stacks (torch, jax, …) used in bioinformatics
-analysis.
+Shared [uv2nix](https://github.com/pyproject-nix/uv2nix) fixups and an env
+builder for GPU/ML Python stacks (torch, jax, RAPIDS, …) — get a project's
+Python env without hand-patching CUDA/native wheels.
 
 This is **not** a package registry. uv resolves package *versions* per project
 from each `uv.lock`; what is reusable is the *fixup logic* for prebuilt binary
@@ -29,7 +29,7 @@ CLI tools (foldseek, gemme, …). Rule of thumb:
 
 All builders accept either `pkgs` or `system` (with `system`, `pkgs` is built
 from this flake's nixpkgs with `allowUnfree`). So a project needs **only the
-`py-overrides` input** — `uv2nix`/`pyproject-nix`/`pyproject-build-systems` are
+`uv2nix-env` input** — `uv2nix`/`pyproject-nix`/`pyproject-build-systems` are
 inherited transitively.
 
 ## Usage in a project
@@ -37,12 +37,12 @@ inherited transitively.
 ```nix
 # <project>/flake.nix
 {
-  inputs.py-overrides.url = "github:mulatta/bioinformatics-py-overrides";
+  inputs.uv2nix-env.url = "github:mulatta/uv2nix-env";
 
   outputs =
-    { py-overrides, ... }:
+    { uv2nix-env, ... }:
     let
-      ws = py-overrides.lib.mkWorkspace {
+      ws = uv2nix-env.lib.mkWorkspace {
         system = "x86_64-linux";
         workspaceRoot = ./.; # pyproject.toml + uv.lock
         cuda = true;
