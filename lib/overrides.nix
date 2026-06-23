@@ -47,7 +47,9 @@ let
     "jaxlib"
   ];
 
-  isTarget = n: lib.hasPrefix "nvidia-" n || builtins.elem n frameworks;
+  # nvidia-* : CUDA runtime wheels (torch & jax share these)
+  # jax-cuda*: jax's CUDA plugin/pjrt wheels (jax-cuda12-plugin, jax-cuda13-pjrt, …)
+  isTarget = n: lib.hasPrefix "nvidia-" n || lib.hasPrefix "jax-cuda" n || builtins.elem n frameworks;
   present = builtins.filter isTarget (builtins.attrNames prev);
 in
 lib.genAttrs present (n: patch prev.${n} [ ])
