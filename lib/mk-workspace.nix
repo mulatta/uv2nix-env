@@ -19,6 +19,7 @@ let
     ../overlays/wheels.nix
     ../overlays/cuda.nix
     ../overlays/torch.nix
+    ../overlays/pyg.nix
     ../overlays/jax.nix
     ../overlays/rapids.nix
   ];
