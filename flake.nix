@@ -82,6 +82,7 @@
         concerns = {
           cuda = import ./overlays/cuda.nix;
           jax = import ./overlays/jax.nix;
+          pyg = import ./overlays/pyg.nix;
           rapids = import ./overlays/rapids.nix;
           torch = import ./overlays/torch.nix;
           wheels = import ./overlays/wheels.nix;

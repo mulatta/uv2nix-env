@@ -23,7 +23,7 @@ CLI tools (foldseek, gemme, …). Rule of thumb:
   interactive shell (impure — uses `$REPO_ROOT`).
 - `lib.mkPyEnv` = `args: (mkWorkspace args).venv` — convenience for the venv.
 - `lib.mkDevShell` = `args: (mkWorkspace args).devShell` — convenience for the shell.
-- `lib.concerns.{cuda,torch,jax,rapids,wheels}` — the raw per-concern rule
+- `lib.concerns.{cuda,torch,pyg,jax,rapids,wheels}` — the raw per-concern rule
   modules (each `{ lib, pkgs, cuda } -> { matches; patch; }`) that mkWorkspace
   composes into a single overlay.
 
@@ -87,6 +87,7 @@ pass), and `lib/patch.nix` is the shared autoPatchelf + driver-runpath helper.
 
 - `cuda.nix` — `nvidia-*` CUDA runtime wheels (shared GPU base)
 - `torch.nix` — PyTorch ecosystem
+- `pyg.nix` — PyTorch Geometric C-extensions (torch-scatter/-sparse/-cluster/-spline-conv/pyg-lib)
 - `jax.nix` — JAX + its `jax-cuda*` plugin wheels
 - `rapids.nix` — cudf/cugraph/rmm/raft/ucxx/kvikio family
 - `wheels.nix` — generic binary wheels (numpy/scipy/numba/cupy), with per-package
