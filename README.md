@@ -18,9 +18,16 @@ CLI tools (foldseek, gemme, …). Rule of thumb:
 ## Public API
 
 - `lib.mkWorkspace` — load a uv workspace once; returns
-  `{ workspace; pythonSet; python; venv; devShell; }` (one resolved set shared by
-  all outputs). `venv` is the **pure** locked env; `devShell` is the **editable**
-  interactive shell (impure — uses `$REPO_ROOT`).
+  `{ workspace; pythonSet; python; venv; mkVenv; venvs; devShell; }` (one resolved
+  set shared by all outputs). `venv` is the **pure** locked env; `devShell` is the
+  **editable** interactive shell (impure — uses `$REPO_ROOT`). Pass `extras` — a
+  list for the root package (`[ "gpu" ]`) or an attrset (`{ pkg = [ "gpu" ]; }`) —
+  to select optional-dependencies for `venv`.
+- `ws.mkVenv { name ? …; extras ? …; editable ? false; }` — build one further
+  venv from the same loaded workspace.
+- `ws.venvs { <name> = <extras>; … }` → `{ <name> = <venv>; … }` — build many
+  named variants at once, for a project that ships several optional-dependency
+  combinations from one `uv.lock`.
 - `lib.mkPyEnv` = `args: (mkWorkspace args).venv` — convenience for the venv.
 - `lib.mkDevShell` = `args: (mkWorkspace args).devShell` — convenience for the shell.
 - `lib.concerns.{cuda,torch,pyg,jax,rapids,wheels}` — the raw per-concern rule
