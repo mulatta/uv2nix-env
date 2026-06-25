@@ -68,123 +68,28 @@ let
     ]
   );
 
-  # torch finds CUDA libs via RPATH, but JAX resolves them via LD_LIBRARY_PATH at
-  # runtime. Under cuda, wrap python so the nvidia wheel lib dirs + host driver
-  # are on the loader path. Harmless for torch (additive); no-op without cuda.
-  wrapCuda =
-    v:
-    if !cuda then
-      v
-    else
-      pkgs.symlinkJoin {
-        inherit (v) name;
-        paths = [ v ];
-        nativeBuildInputs = [ pkgs.makeWrapper ];
-        postBuild = ''
-          libdirs=""
-          for d in ${v}/lib/python*/site-packages/nvidia/*/lib; do
-            [ -d "$d" ] && libdirs="$libdirs''${libdirs:+:}$d"
-          done
-          driver="${pkgs.addDriverRunpath.driverLink}/lib"
-          for py in python python3; do
-            if [ -e "$out/bin/$py" ]; then
-              rm -f "$out/bin/$py"
-              makeWrapper "${v}/bin/$py" "$out/bin/$py" \
-                --prefix LD_LIBRARY_PATH : "$libdirs:$driver"
-            fi
-          done
-        '';
-      };
-
   # Editable dev set: source is loaded from $REPO_ROOT at runtime (impure).
   editableSet = pythonSet.overrideScope (
     workspace.mkEditablePyprojectOverlay { root = "$REPO_ROOT"; }
   );
 
-  # A bare extras list targets the workspace's root package; an attrset
-  # ({ pkg = [ ... ]; }) targets packages explicitly (multi-member workspaces).
-  rootName = builtins.head (builtins.attrNames workspace.deps.default);
-  toSpec = e: if builtins.isAttrs e then e else { ${rootName} = e; };
+  wrapCuda = import ./wrap-cuda.nix { inherit pkgs cuda; };
 
-  # Build a venv from this one resolved set. `extras` selects optional
-  # dependencies (a list for the root package, or an attrset per package);
-  # `//`-merged over the default closure, so a listed package's extras REPLACE
-  # its defaults (a variant built as `[ "esm" ]` drops a `test` group that lived
-  # in the default closure — pass `[ "esm" "test" ]` to keep it). `editable`
-  # swaps in the $REPO_ROOT set. CUDA wrapping is applied, so a project can build
-  # several variants without reloading the workspace.
-  mkVenv =
-    args:
-    let
-      venvName = args.name or name;
-      venvExtras = toSpec (args.extras or extras);
-      editable = args.editable or false;
-    in
-    wrapCuda (
-      (if editable then editableSet else pythonSet).mkVirtualEnv venvName (
-        workspace.deps.default // venvExtras
-      )
-    );
-
-  # Build many named venvs at once: { <name> = <extras>; } -> { <name> = <venv>; }.
-  venvs = builtins.mapAttrs (
-    venvName: venvExtras:
-    mkVenv {
-      name = venvName;
-      extras = venvExtras;
-    }
-  );
-
-  venv = mkVenv { };
-
-  # Editable dev shell over this resolved set. `extras` selects optional
-  # dependencies (list/attrset like mkVenv); omit it for the full deps.all
-  # closure. `nativeLibs` extends the editable shell's LD_LIBRARY_PATH (libstdc++
-  # and zlib are always present, for the C-extension wheels most stacks pull in).
-  # `env`/`shellHook`/`packages` are merged over the library defaults so a project
-  # adds its own without restating the standard uv/REPO_ROOT wiring.
-  mkDevShell =
-    args:
-    let
-      shellName = args.name or "${name}-dev";
-      shellDeps =
-        if args ? extras then workspace.deps.default // toSpec args.extras else workspace.deps.all;
-      dv = wrapCuda (editableSet.mkVirtualEnv shellName shellDeps);
-      libraryPath = lib.makeLibraryPath (
-        [
-          pkgs.stdenv.cc.cc.lib
-          pkgs.zlib
-        ]
-        ++ (args.nativeLibs or [ ])
-      );
-    in
-    pkgs.mkShell {
-      packages = [
-        dv
-        pkgs.uv
-      ]
-      ++ (args.packages or [ ]);
-      env = {
-        UV_NO_SYNC = "1";
-        UV_PYTHON = "${dv}/bin/python";
-        UV_PYTHON_DOWNLOADS = "never";
-        LD_LIBRARY_PATH = libraryPath;
-      }
-      // (args.env or { });
-      shellHook = ''
-        unset PYTHONPATH
-        export REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-      ''
-      + (args.shellHook or "");
-    };
-
-  devShell = mkDevShell { };
+  # The venv/devShell builders over this resolved set (see lib/builders.nix).
+  builders = import ./builders.nix { inherit lib pkgs; } {
+    inherit
+      workspace
+      pythonSet
+      editableSet
+      wrapCuda
+      name
+      extras
+      ;
+  };
 in
 {
-  inherit
-    workspace
-    pythonSet
-    python
+  inherit workspace pythonSet python;
+  inherit (builders)
     venv
     mkVenv
     venvs
