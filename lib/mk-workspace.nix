@@ -39,6 +39,10 @@ in
   sourcePreference ? "wheel",
   overrides ? (_final: _prev: { }),
   name ? "venv",
+  # Optional-dependencies for the default `venv`, per package — e.g.
+  # { mypkg = [ "gpu" ]; }. Merged over the default closure. Use `mkVenv` (below)
+  # to build further variants from the same loaded workspace.
+  extras ? { },
 }:
 let
   workspace = uv2nix.lib.workspace.loadWorkspace { inherit workspaceRoot; };
@@ -84,12 +88,44 @@ let
         '';
       };
 
-  venv = wrapCuda (pythonSet.mkVirtualEnv name workspace.deps.default);
-
-  # Editable dev env: source is loaded from $REPO_ROOT at runtime (impure).
+  # Editable dev set: source is loaded from $REPO_ROOT at runtime (impure).
   editableSet = pythonSet.overrideScope (
     workspace.mkEditablePyprojectOverlay { root = "$REPO_ROOT"; }
   );
+
+  # A bare extras list targets the workspace's root package; an attrset
+  # ({ pkg = [ ... ]; }) targets packages explicitly (multi-member workspaces).
+  rootName = builtins.head (builtins.attrNames workspace.deps.default);
+  toSpec = e: if builtins.isAttrs e then e else { ${rootName} = e; };
+
+  # Build a venv from this one resolved set. `extras` selects optional
+  # dependencies (a list for the root package, or an attrset per package) merged
+  # over the default closure; `editable` swaps in the $REPO_ROOT set. CUDA
+  # wrapping is applied, so a project can build several variants without
+  # reloading the workspace.
+  mkVenv =
+    args:
+    let
+      venvName = args.name or name;
+      venvExtras = toSpec (args.extras or extras);
+      editable = args.editable or false;
+    in
+    wrapCuda (
+      (if editable then editableSet else pythonSet).mkVirtualEnv venvName (
+        workspace.deps.default // venvExtras
+      )
+    );
+
+  # Build many named venvs at once: { <name> = <extras>; } -> { <name> = <venv>; }.
+  venvs = builtins.mapAttrs (
+    venvName: venvExtras:
+    mkVenv {
+      name = venvName;
+      extras = venvExtras;
+    }
+  );
+
+  venv = mkVenv { };
   devVenv = wrapCuda (editableSet.mkVirtualEnv "${name}-dev" workspace.deps.all);
   devShell = pkgs.mkShell {
     packages = [
@@ -113,6 +149,8 @@ in
     pythonSet
     python
     venv
+    mkVenv
+    venvs
     devShell
     ;
 }
