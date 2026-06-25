@@ -40,9 +40,17 @@ in
   overrides ? (_final: _prev: { }),
   name ? "venv",
   # Optional-dependencies for the default `venv`, per package — e.g.
-  # { mypkg = [ "gpu" ]; }. Merged over the default closure. Use `mkVenv` (below)
-  # to build further variants from the same loaded workspace.
+  # { mypkg = [ "gpu" ]; }. Combined with the default closure by a shallow (`//`)
+  # merge: a package present in both takes the `extras` value, so listing a
+  # package REPLACES its default extras rather than unioning (give the full list
+  # if you mean to keep them). Use `mkVenv` (below) for further variants.
   extras ? { },
+  # Project-specific concern modules, applied after the built-in ones. Each is
+  # the same `{ lib, pkgs, cuda } -> { matches; patch; }` shape as lib.concerns.*
+  # (a path or an inline function) — so a project patches a whole name *pattern*
+  # (e.g. its 20 internal `acme-*` wheels) without forking. For a single package,
+  # prefer `overrides`.
+  extraConcerns ? [ ],
 }:
 let
   workspace = uv2nix.lib.workspace.loadWorkspace { inherit workspaceRoot; };
@@ -54,7 +62,7 @@ let
       workspaceOverlay
       (import ../lib/apply-concerns.nix {
         inherit lib pkgs cuda;
-        modules = concernModules;
+        modules = concernModules ++ extraConcerns;
       })
       overrides
     ]
@@ -99,10 +107,12 @@ let
   toSpec = e: if builtins.isAttrs e then e else { ${rootName} = e; };
 
   # Build a venv from this one resolved set. `extras` selects optional
-  # dependencies (a list for the root package, or an attrset per package) merged
-  # over the default closure; `editable` swaps in the $REPO_ROOT set. CUDA
-  # wrapping is applied, so a project can build several variants without
-  # reloading the workspace.
+  # dependencies (a list for the root package, or an attrset per package);
+  # `//`-merged over the default closure, so a listed package's extras REPLACE
+  # its defaults (a variant built as `[ "esm" ]` drops a `test` group that lived
+  # in the default closure — pass `[ "esm" "test" ]` to keep it). `editable`
+  # swaps in the $REPO_ROOT set. CUDA wrapping is applied, so a project can build
+  # several variants without reloading the workspace.
   mkVenv =
     args:
     let

@@ -22,7 +22,10 @@ CLI tools (foldseek, gemme, …). Rule of thumb:
   (one resolved set shared by all outputs). `venv` is the **pure** locked env;
   `devShell` is the **editable** interactive shell (impure — uses `$REPO_ROOT`).
   Pass `extras` — a list for the root package (`[ "gpu" ]`) or an attrset
-  (`{ pkg = [ "gpu" ]; }`) — to select optional-dependencies for `venv`.
+  (`{ pkg = [ "gpu" ]; }`) — to select optional-dependencies for `venv`. extras
+  are `//`-merged over the default closure, so a listed package's extras
+  **replace** its defaults (building `[ "esm" ]` drops a `test` group baked into
+  the default closure; pass `[ "esm" "test" ]` to keep it).
 - `ws.mkVenv { name ? …; extras ? …; editable ? false; }` — build one further
   venv from the same loaded workspace.
 - `ws.venvs { <name> = <extras>; … }` → `{ <name> = <venv>; … }` — build many
@@ -35,6 +38,14 @@ CLI tools (foldseek, gemme, …). Rule of thumb:
   merge over them, and `nativeLibs` extends the library path.
 - `lib.mkPyEnv` = `args: (mkWorkspace args).venv` — convenience for the venv.
 - `lib.mkDevShell` = `args: (mkWorkspace args).devShell` — convenience for the shell.
+- `mkWorkspace`'s `extraConcerns ? []` — project-specific concern modules (paths
+  or inline `{ lib, pkgs, cuda } -> { matches; patch; }` functions) applied after
+  the built-ins, so a project patches a whole name *pattern* (e.g. its internal
+  `acme-*` wheels) without forking. For a single package, prefer `overrides`.
+- `lib.mkPatch` — the shared wheel fixup (`{ lib, pkgs, cuda } -> drv ->
+  extraBuildInputs -> drv'`); use it inside an `extraConcerns` entry.
+- `lib.addBuildSystem` — the common `overrides` case (a package forgot its
+  build-system): `overrides = final: prev: { fbpca = addBuildSystem final { setuptools = [ ]; } prev.fbpca; }`.
 - `lib.concerns.{cuda,torch,pyg,jax,rapids,wheels}` — the raw per-concern rule
   modules (each `{ lib, pkgs, cuda } -> { matches; patch; }`) that mkWorkspace
   composes into a single overlay.

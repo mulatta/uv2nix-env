@@ -76,10 +76,27 @@
       mkDevShell = args: (mkWorkspace args).devShell;
     in
     {
-      # Public API: the env builders + the raw per-concern rule modules
+      # Public API: the env builders, helpers for writing overrides/extraConcerns,
+      # and the raw per-concern rule modules
       # (each `{ lib; pkgs; cuda; } -> { matches; patch; }`) for manual use.
       lib = {
         inherit mkWorkspace mkPyEnv mkDevShell;
+
+        # The library's shared wheel fixup: `{ lib, pkgs, cuda } -> drv ->
+        # extraBuildInputs -> drv'` (autoPatchelf + native libs + driver runpath).
+        # Use it inside a custom `extraConcerns` entry so a project concern is as
+        # terse as the built-in ones.
+        mkPatch = import ./lib/patch.nix;
+
+        # The common `overrides` case: give a package a build-system it forgot to
+        # declare. Use as: overrides = final: prev:
+        #   { fbpca = addBuildSystem final { setuptools = [ ]; } prev.fbpca; };
+        addBuildSystem =
+          final: buildSystems: drv:
+          drv.overrideAttrs (old: {
+            nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ final.resolveBuildSystem buildSystems;
+          });
+
         concerns = {
           cuda = import ./overlays/cuda.nix;
           jax = import ./overlays/jax.nix;
