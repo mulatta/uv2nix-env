@@ -7,7 +7,7 @@
 }:
 # mkWorkspace: load a uv workspace (pyproject.toml + uv.lock) once and return a
 # first-class attrset of derived outputs that share one resolved package set:
-#   { workspace; pythonSet; python; venv; devShell; }
+#   { workspace; pythonSet; python; venv; mkVenv; venvs; devShell; mkDevShell; }
 # - venv     : PURE, hash-locked virtual env (build / run / package).
 # - devShell : editable interactive shell (impure — references $REPO_ROOT live),
 #              mirroring uv2nix's own hello-world template split.
@@ -126,22 +126,49 @@ let
   );
 
   venv = mkVenv { };
-  devVenv = wrapCuda (editableSet.mkVirtualEnv "${name}-dev" workspace.deps.all);
-  devShell = pkgs.mkShell {
-    packages = [
-      devVenv
-      pkgs.uv
-    ];
-    env = {
-      UV_NO_SYNC = "1";
-      UV_PYTHON = "${devVenv}/bin/python";
-      UV_PYTHON_DOWNLOADS = "never";
+
+  # Editable dev shell over this resolved set. `extras` selects optional
+  # dependencies (list/attrset like mkVenv); omit it for the full deps.all
+  # closure. `nativeLibs` extends the editable shell's LD_LIBRARY_PATH (libstdc++
+  # and zlib are always present, for the C-extension wheels most stacks pull in).
+  # `env`/`shellHook`/`packages` are merged over the library defaults so a project
+  # adds its own without restating the standard uv/REPO_ROOT wiring.
+  mkDevShell =
+    args:
+    let
+      shellName = args.name or "${name}-dev";
+      shellDeps =
+        if args ? extras then workspace.deps.default // toSpec args.extras else workspace.deps.all;
+      dv = wrapCuda (editableSet.mkVirtualEnv shellName shellDeps);
+      libraryPath = lib.makeLibraryPath (
+        [
+          pkgs.stdenv.cc.cc.lib
+          pkgs.zlib
+        ]
+        ++ (args.nativeLibs or [ ])
+      );
+    in
+    pkgs.mkShell {
+      packages = [
+        dv
+        pkgs.uv
+      ]
+      ++ (args.packages or [ ]);
+      env = {
+        UV_NO_SYNC = "1";
+        UV_PYTHON = "${dv}/bin/python";
+        UV_PYTHON_DOWNLOADS = "never";
+        LD_LIBRARY_PATH = libraryPath;
+      }
+      // (args.env or { });
+      shellHook = ''
+        unset PYTHONPATH
+        export REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+      ''
+      + (args.shellHook or "");
     };
-    shellHook = ''
-      unset PYTHONPATH
-      export REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-    '';
-  };
+
+  devShell = mkDevShell { };
 in
 {
   inherit
@@ -152,5 +179,6 @@ in
     mkVenv
     venvs
     devShell
+    mkDevShell
     ;
 }

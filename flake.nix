@@ -61,7 +61,8 @@
       );
 
       # The reusable bits projects import. mkWorkspace is the core (returns
-      # { workspace; pythonSet; python; venv; devShell; }); the others are aliases.
+      # { workspace; pythonSet; python; venv; mkVenv; venvs; devShell; mkDevShell; });
+      # the others are aliases.
       mkWorkspace = import ./lib/mk-workspace.nix {
         inherit (nixpkgs) lib;
         inherit
