@@ -9,11 +9,15 @@ from each `uv.lock`; what is reusable is the *fixup logic* for prebuilt binary
 wheels (RPATHs, libstdc++/zlib, CUDA driver wiring). That lives here once and is
 composed into every project's env.
 
-Companion to [`bioinformatics-toolkits`](../bioinformatics-toolkits), which holds
-CLI tools (foldseek, gemme, …). Rule of thumb:
+It's for any uv-based Python project that needs prebuilt GPU/native wheels. It
+grew out of packaging bioinformatics stacks, but nothing here is domain-specific —
+the fixups are about wheels and CUDA, not any one field. The dividing line it
+draws is `import` vs. run:
 
-- **`import` it in analysis code** → here / uv2nix (esm, torch, biotite, …)
-- **run it as a command** → bioinformatics-toolkits (foldseek, gemme, …)
+- **`import` it in analysis code** → a Python env (esm, torch, biotite, …) — this
+  is uv2nix-env's job.
+- **run it as a command** → a standalone CLI tool (foldseek, gemme, …) — package
+  that elsewhere (e.g. a dedicated tools flake); it doesn't belong in a uv env.
 
 ## Public API
 

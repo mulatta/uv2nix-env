@@ -8,7 +8,6 @@
 # runtime (cuda.nix); uv resolves the inter-package graph so autoPatchelf finds
 # sibling .so via buildInputs.
 let
-  basePatch = import ../lib/patch.nix { inherit lib pkgs cuda; };
   # RAPIDS-unique roots. Deliberately avoid bare generic words ("raft", "rmm",
   # "ucxx") that could match unrelated PyPI packages — require their lib*/pylib*/
   # -cu forms instead.
@@ -34,7 +33,6 @@ let
     "distributed-ucxx"
   ];
 in
-{
-  matches = n: lib.any (p: lib.hasPrefix p n) prefixes;
-  patch = _name: drv: basePatch drv [ ];
+(import ../lib/mk-concern.nix { inherit lib pkgs cuda; }) {
+  match = n: lib.any (p: lib.hasPrefix p n) prefixes;
 }

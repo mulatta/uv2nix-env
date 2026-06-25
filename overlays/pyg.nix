@@ -14,17 +14,14 @@
 # publishes no hashes. That is a *lockfile* concern, not a build one: the
 # consumer must complete the missing sha256 in their uv.lock (uv preserves
 # manually-provided hashes). This concern only does the post-fetch ELF fixup.
-let
-  basePatch = import ../lib/patch.nix { inherit lib pkgs cuda; };
-  names = [
-    "torch-scatter"
-    "torch-sparse"
-    "torch-cluster"
-    "torch-spline-conv"
-    "pyg-lib"
-  ];
-in
-{
-  matches = n: builtins.elem n names;
-  patch = _name: drv: basePatch drv [ ];
+(import ../lib/mk-concern.nix { inherit lib pkgs cuda; }) {
+  match =
+    n:
+    builtins.elem n [
+      "torch-scatter"
+      "torch-sparse"
+      "torch-cluster"
+      "torch-spline-conv"
+      "pyg-lib"
+    ];
 }

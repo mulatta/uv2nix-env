@@ -7,16 +7,12 @@
 # …). JAX resolves CUDA libs via LD_LIBRARY_PATH at runtime — that wiring lives
 # in lib/mk-workspace.nix (the python wrapper); this rule only RPATH-patches the
 # wheels.
-let
-  basePatch = import ../lib/patch.nix { inherit lib pkgs cuda; };
-in
-{
-  matches =
+(import ../lib/mk-concern.nix { inherit lib pkgs cuda; }) {
+  match =
     n:
     builtins.elem n [
       "jax"
       "jaxlib"
     ]
     || lib.hasPrefix "jax-cuda" n;
-  patch = _name: drv: basePatch drv [ ];
 }

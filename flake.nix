@@ -88,6 +88,11 @@
         # terse as the built-in ones.
         mkPatch = import ./lib/patch.nix;
 
+        # Build a concern from a name matcher (what every built-in overlay uses):
+        # `{ lib, pkgs, cuda } -> { match; extraInputs ? _: [ ]; } -> { matches; patch; }`.
+        # The terse way to write an `extraConcerns` entry.
+        mkConcern = import ./lib/mk-concern.nix;
+
         # The common `overrides` case: give a package a build-system it forgot to
         # declare. Use as: overrides = final: prev:
         #   { fbpca = addBuildSystem final { setuptools = [ ]; } prev.fbpca; };

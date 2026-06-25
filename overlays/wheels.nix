@@ -6,7 +6,6 @@
 # Generic prebuilt binary wheels (not tied to a framework) that bundle ELF and
 # sometimes need extra system libs. `specs` maps package -> extra buildInputs.
 let
-  basePatch = import ../lib/patch.nix { inherit lib pkgs cuda; };
   cu = pkgs.cudaPackages;
   specs = {
     numpy = [ ];
@@ -27,7 +26,7 @@ let
     ];
   };
 in
-{
-  matches = n: builtins.hasAttr n specs;
-  patch = name: drv: basePatch drv specs.${name};
+(import ../lib/mk-concern.nix { inherit lib pkgs cuda; }) {
+  match = n: builtins.hasAttr n specs;
+  extraInputs = name: specs.${name};
 }

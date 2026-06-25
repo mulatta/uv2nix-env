@@ -16,7 +16,15 @@ in
 _final: prev:
 let
   names = builtins.attrNames prev;
+  # `acc // genAttrs ...` is last-wins: if two concerns match the same package,
+  # the earlier patch is dropped, not composed. Concerns are meant to be disjoint;
+  # assert it so an overlap is a build-time error, not a silent miss.
+  matchedPerRule = map (r: builtins.filter r.matches names) rules;
+  allMatched = lib.concatLists matchedPerRule;
+  collisions = lib.unique (builtins.filter (n: lib.count (x: x == n) allMatched > 1) allMatched);
 in
+assert lib.assertMsg (collisions == [ ])
+  "uv2nix-env: package(s) matched by more than one concern (last would silently win): ${lib.concatStringsSep ", " collisions}";
 lib.foldl' (
   acc: r: acc // lib.genAttrs (builtins.filter r.matches names) (n: r.patch n prev.${n})
 ) { } rules
