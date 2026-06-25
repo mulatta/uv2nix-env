@@ -4,13 +4,10 @@
   cuda ? false,
 }:
 # RAPIDS ecosystem wheels (cudf/cugraph/rmm/raft/ucxx/kvikio + their lib*/pylib*
-# split packages). Ship prebuilt ELF and depend on the shared nvidia-* CUDA
-# runtime (cuda.nix); uv resolves the inter-package graph so autoPatchelf finds
-# sibling .so via buildInputs.
+# split packages). Depend on the shared nvidia-* CUDA runtime (cuda.nix).
 let
-  # RAPIDS-unique roots. Deliberately avoid bare generic words ("raft", "rmm",
-  # "ucxx") that could match unrelated PyPI packages — require their lib*/pylib*/
-  # -cu forms instead.
+  # Avoid bare generic words ("raft", "rmm", "ucxx") that could match unrelated
+  # PyPI packages — require their lib*/pylib*/-cu forms instead.
   prefixes = [
     "cudf"
     "libcudf"

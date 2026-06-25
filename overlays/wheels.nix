@@ -3,8 +3,8 @@
   pkgs,
   cuda ? false,
 }:
-# Generic prebuilt binary wheels (not tied to a framework) that bundle ELF and
-# sometimes need extra system libs. `specs` maps package -> extra buildInputs.
+# Generic prebuilt binary wheels (not framework-tied). `specs` maps package ->
+# extra buildInputs.
 let
   cu = pkgs.cudaPackages;
   specs = {

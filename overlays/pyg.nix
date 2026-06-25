@@ -3,17 +3,13 @@
   pkgs,
   cuda ? false,
 }:
-# PyTorch Geometric C-extension wheels (torch-scatter / -sparse / -cluster /
-# -spline-conv / pyg-lib). These are prebuilt binaries linked against libtorch
-# and the CUDA runtime, so they need exactly the torch wheel treatment:
-# autoPatchelf for the usual native libs plus the host driver runpath, with the
-# libtorch/libc10/libcuda deps left unresolved at build time — `import torch`
-# loads them into the process first, so the extension .so resolve them at import.
+# PyTorch Geometric C-extension wheels (torch-scatter/-sparse/-cluster/
+# -spline-conv/pyg-lib). Linked against libtorch + CUDA runtime; those deps stay
+# unresolved at build time since `import torch` loads them into the process first.
 #
-# Note: these wheels are served from PyG's flat index (data.pyg.org), which
-# publishes no hashes. That is a *lockfile* concern, not a build one: the
-# consumer must complete the missing sha256 in their uv.lock (uv preserves
-# manually-provided hashes). This concern only does the post-fetch ELF fixup.
+# These wheels come from PyG's flat index (data.pyg.org), which publishes no
+# hashes — a *lockfile* concern, not a build one: the consumer must complete the
+# missing sha256 in their uv.lock (uv preserves manually-provided hashes).
 (import ../lib/mk-concern.nix { inherit lib pkgs cuda; }) {
   match =
     n:

@@ -55,14 +55,12 @@
             nixfmt.enable = true;
             statix.enable = true;
           };
-          # The example workspace is plain Python, not Nix.
+          # example/ is plain Python, not Nix.
           settings.global.excludes = [ "example/**" ];
         }
       );
 
-      # The reusable bits projects import. mkWorkspace is the core (returns
-      # { workspace; pythonSet; python; venv; mkVenv; venvs; devShell; mkDevShell; });
-      # the others are aliases.
+      # mkWorkspace is the core; mkPyEnv/mkDevShell are thin aliases onto its outputs.
       mkWorkspace = import ./lib/mk-workspace.nix {
         inherit (nixpkgs) lib;
         inherit
@@ -76,26 +74,20 @@
       mkDevShell = args: (mkWorkspace args).devShell;
     in
     {
-      # Public API: the env builders, helpers for writing overrides/extraConcerns,
-      # and the raw per-concern rule modules
-      # (each `{ lib; pkgs; cuda; } -> { matches; patch; }`) for manual use.
+      # Public API: env builders, helpers for overrides/extraConcerns, and the raw
+      # per-concern rule modules for manual use.
       lib = {
         inherit mkWorkspace mkPyEnv mkDevShell;
 
-        # The library's shared wheel fixup: `{ lib, pkgs, cuda } -> drv ->
-        # extraBuildInputs -> drv'` (autoPatchelf + native libs + driver runpath).
-        # Use it inside a custom `extraConcerns` entry so a project concern is as
-        # terse as the built-in ones.
+        # Shared wheel fixup (autoPatchelf + native libs + driver runpath); use it
+        # inside a custom `extraConcerns` entry.
         mkPatch = import ./lib/patch.nix;
 
-        # Build a concern from a name matcher (what every built-in overlay uses):
-        # `{ lib, pkgs, cuda } -> { match; extraInputs ? _: [ ]; } -> { matches; patch; }`.
-        # The terse way to write an `extraConcerns` entry.
+        # Build a concern from a name matcher; the terse way to write `extraConcerns`.
         mkConcern = import ./lib/mk-concern.nix;
 
-        # The common `overrides` case: give a package a build-system it forgot to
-        # declare. Use as: overrides = final: prev:
-        #   { fbpca = addBuildSystem final { setuptools = [ ]; } prev.fbpca; };
+        # Give a package a build-system it forgot to declare. Use as:
+        #   overrides = final: prev: { fbpca = addBuildSystem final { setuptools = [ ]; } prev.fbpca; };
         addBuildSystem =
           final: buildSystems: drv:
           drv.overrideAttrs (old: {
@@ -112,8 +104,7 @@
         };
       };
 
-      # Project scaffolds (also serve as worked examples per stack):
-      #   nix flake init -t github:mulatta/uv2nix-env#<name>
+      # Project scaffolds: nix flake init -t github:mulatta/uv2nix-env#<name>
       templates =
         let
           mk = name: desc: {
@@ -128,7 +119,7 @@
           rapids = mk "rapids" "RAPIDS cudf (CUDA) project using uv2nix-env";
         };
 
-      # Light end-to-end self-check: build the example workspace's venv.
+      # End-to-end self-check: build the example workspace's venv.
       packages = eachSystem (
         { pkgs, ... }:
         {

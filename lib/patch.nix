@@ -3,10 +3,9 @@
   pkgs,
   cuda ? false,
 }:
-# Shared fixup applied by every overlay: autoPatchelf a prebuilt binary wheel
-# (fix RPATHs), add the usual native libs, and — under CUDA — append the host
-# driver's lib dir so libcuda.so resolves at runtime. Returns a function
-# `drv: extraBuildInputs -> drv'`.
+# Shared fixup applied by every overlay: autoPatchelf a prebuilt binary wheel,
+# add the usual native libs, and — under CUDA — append the host driver's lib dir
+# so libcuda.so resolves at runtime.
 drv: extraBuildInputs:
 drv.overrideAttrs (
   old:
