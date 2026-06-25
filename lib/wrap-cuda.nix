@@ -4,8 +4,7 @@
 }:
 # torch finds CUDA libs via RPATH, but JAX resolves them via LD_LIBRARY_PATH at
 # runtime. Under cuda, wrap python so the nvidia wheel lib dirs + host driver are
-# on the loader path. Harmless for torch (additive); no-op without cuda — returns
-# the venv unchanged.
+# on the loader path (additive/harmless for torch). No-op without cuda.
 v:
 if !cuda then
   v

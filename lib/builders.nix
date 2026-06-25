@@ -2,9 +2,7 @@
   lib,
   pkgs,
 }:
-# The venv/devShell builders over one already-resolved package set. mkWorkspace
-# builds `pythonSet`/`editableSet`/`wrapCuda` and hands them here; keeping the
-# builders out of mkWorkspace keeps each piece small and independently readable.
+# venv/devShell builders over one already-resolved package set, fed by mkWorkspace.
 {
   workspace,
   pythonSet,
@@ -19,13 +17,9 @@ let
   rootName = builtins.head (builtins.attrNames workspace.deps.default);
   toSpec = e: if builtins.isAttrs e then e else { ${rootName} = e; };
 
-  # Build a venv from this one resolved set. `extras` selects optional
-  # dependencies (a list for the root package, or an attrset per package);
-  # `//`-merged over the default closure, so a listed package's extras REPLACE
-  # its defaults (a variant built as `[ "esm" ]` drops a `test` group that lived
-  # in the default closure — pass `[ "esm" "test" ]` to keep it). `editable`
-  # swaps in the $REPO_ROOT set. CUDA wrapping is applied, so a project can build
-  # several variants without reloading the workspace.
+  # `extras` (list for root pkg, or attrset per pkg) is `//`-merged over the
+  # default closure, so a listed package's extras REPLACE its defaults, not union.
+  # `editable` swaps in the $REPO_ROOT set.
   mkVenv =
     args:
     let
@@ -39,7 +33,7 @@ let
       )
     );
 
-  # Build many named venvs at once: { <name> = <extras>; } -> { <name> = <venv>; }.
+  # { <name> = <extras>; } -> { <name> = <venv>; }.
   venvs = builtins.mapAttrs (
     venvName: venvExtras:
     mkVenv {
@@ -50,12 +44,10 @@ let
 
   venv = mkVenv { };
 
-  # Editable dev shell over this resolved set. `extras` selects optional
-  # dependencies (list/attrset like mkVenv); omit it for the full deps.all
-  # closure. `nativeLibs` extends the editable shell's LD_LIBRARY_PATH (libstdc++
-  # and zlib are always present, for the C-extension wheels most stacks pull in).
-  # `env`/`shellHook`/`packages` are merged over the library defaults so a project
-  # adds its own without restating the standard uv/REPO_ROOT wiring.
+  # `extras` like mkVenv; omit it for the full deps.all closure. `nativeLibs`
+  # extends LD_LIBRARY_PATH (libstdc++ and zlib are always present, for the
+  # C-extension wheels most stacks pull in). `env`/`shellHook`/`packages` merge
+  # over the defaults.
   mkDevShell =
     args:
     let
