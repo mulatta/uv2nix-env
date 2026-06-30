@@ -15,7 +15,8 @@ else
     nativeBuildInputs = [ pkgs.makeWrapper ];
     postBuild = ''
       libdirs=""
-      for d in ${v}/lib/python*/site-packages/nvidia/*/lib; do
+      for d in ${v}/lib/python*/site-packages/nvidia/*/lib \
+               ${v}/lib/python*/site-packages/cusparselt/lib; do
         [ -d "$d" ] && libdirs="$libdirs''${libdirs:+:}$d"
       done
       driver="${pkgs.addDriverRunpath.driverLink}/lib"
