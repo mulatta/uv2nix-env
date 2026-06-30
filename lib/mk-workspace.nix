@@ -8,16 +8,6 @@
 # Load a uv workspace (pyproject.toml + uv.lock) once and return outputs sharing
 # one resolved package set. venv is PURE/hash-locked; devShell is editable/impure
 # (references $REPO_ROOT live), mirroring uv2nix's hello-world template split.
-let
-  concernModules = [
-    ../overlays/wheels.nix
-    ../overlays/cuda.nix
-    ../overlays/torch.nix
-    ../overlays/pyg.nix
-    ../overlays/jax.nix
-    ../overlays/rapids.nix
-  ];
-in
 {
   # Pass `pkgs` to share a project's own nixpkgs (ideally follows uv2nix-env/nixpkgs),
   # or `system` to build it here with allowUnfree on for CUDA.
@@ -36,9 +26,6 @@ in
   # Shallow-merged (`//`) over the default closure: a listed package's extras
   # REPLACE its defaults, not union — give the full list to keep them.
   extras ? { },
-  # Project concern modules applied after the built-ins (same shape as
-  # lib.concerns.*), to patch a whole name pattern. For a single package use `overrides`.
-  extraConcerns ? [ ],
 }:
 let
   workspace = uv2nix.lib.workspace.loadWorkspace { inherit workspaceRoot; };
@@ -48,9 +35,11 @@ let
     lib.composeManyExtensions [
       pyproject-build-systems.overlays.default
       workspaceOverlay
-      (import ../lib/apply-concerns.nix {
+      # Universal wheel fixup (keyed off uv2nix's passthru.format), plus the
+      # short exact-name table of per-package native libs. No name allowlist.
+      (import ./base-overlay.nix {
         inherit lib pkgs cuda;
-        modules = concernModules ++ extraConcerns;
+        extraInputs = import ./extra-inputs.nix { inherit pkgs; };
       })
       overrides
     ]

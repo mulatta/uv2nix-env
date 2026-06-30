@@ -74,17 +74,14 @@
       mkDevShell = args: (mkWorkspace args).devShell;
     in
     {
-      # Public API: env builders, helpers for overrides/extraConcerns, and the raw
-      # per-concern rule modules for manual use.
+      # Public API: env builders and helpers for project-local overrides.
       lib = {
         inherit mkWorkspace mkPyEnv mkDevShell;
 
-        # Shared wheel fixup (autoPatchelf + native libs + driver runpath); use it
-        # inside a custom `extraConcerns` entry.
+        # The shared per-wheel fixup ({ lib, pkgs, cuda } -> drv -> extraInputs ->
+        # drv'). mkWorkspace applies it to every wheel automatically; exposed for
+        # use inside a project's own `overrides` when hand-patching a package.
         mkPatch = import ./lib/patch.nix;
-
-        # Build a concern from a name matcher; the terse way to write `extraConcerns`.
-        mkConcern = import ./lib/mk-concern.nix;
 
         # Give a package a build-system it forgot to declare. Use as:
         #   overrides = final: prev: { fbpca = addBuildSystem final { setuptools = [ ]; } prev.fbpca; };
@@ -93,15 +90,6 @@
           drv.overrideAttrs (old: {
             nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ final.resolveBuildSystem buildSystems;
           });
-
-        concerns = {
-          cuda = import ./overlays/cuda.nix;
-          jax = import ./overlays/jax.nix;
-          pyg = import ./overlays/pyg.nix;
-          rapids = import ./overlays/rapids.nix;
-          torch = import ./overlays/torch.nix;
-          wheels = import ./overlays/wheels.nix;
-        };
       };
 
       # Project scaffolds: nix flake init -t github:mulatta/uv2nix-env#<name>

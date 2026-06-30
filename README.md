@@ -42,17 +42,11 @@ draws is `import` vs. run:
   merge over them, and `nativeLibs` extends the library path.
 - `lib.mkPyEnv` = `args: (mkWorkspace args).venv` — convenience for the venv.
 - `lib.mkDevShell` = `args: (mkWorkspace args).devShell` — convenience for the shell.
-- `mkWorkspace`'s `extraConcerns ? []` — project-specific concern modules (paths
-  or inline `{ lib, pkgs, cuda } -> { matches; patch; }` functions) applied after
-  the built-ins, so a project patches a whole name *pattern* (e.g. its internal
-  `acme-*` wheels) without forking. For a single package, prefer `overrides`.
-- `lib.mkPatch` — the shared wheel fixup (`{ lib, pkgs, cuda } -> drv ->
-  extraBuildInputs -> drv'`); use it inside an `extraConcerns` entry.
+- `lib.mkPatch` — the shared per-wheel fixup (`{ lib, pkgs, cuda } -> drv ->
+  extraBuildInputs -> drv'`). mkWorkspace already applies it to every wheel; reach
+  for it inside a project's own `overrides` only when hand-patching a package.
 - `lib.addBuildSystem` — the common `overrides` case (a package forgot its
   build-system): `overrides = final: prev: { fbpca = addBuildSystem final { setuptools = [ ]; } prev.fbpca; }`.
-- `lib.concerns.{cuda,torch,pyg,jax,rapids,wheels}` — the raw per-concern rule
-  modules (each `{ lib, pkgs, cuda } -> { matches; patch; }`) that mkWorkspace
-  composes into a single overlay.
 
 All builders accept either `pkgs` or `system` (with `system`, `pkgs` is built
 from this flake's nixpkgs with `allowUnfree`). So a project needs **only the
@@ -105,26 +99,31 @@ fixups are inherited from here.
 > installs natively — **`uv_build`** is recommended (hatchling additionally needs
 > the `editables` build dep). The pure `venv` works with any backend.
 
-## Extending the overrides
+## How the fixup works
 
-Fixups are split by concern under `overlays/`. Each file is a declarative rule
-`{ lib, pkgs, cuda } -> { matches = name -> bool; patch = name -> drv -> drv'; }`;
-`lib/apply-concerns.nix` composes them into one overlay (single `attrNames`
-pass), and `lib/patch.nix` is the shared autoPatchelf + driver-runpath helper.
+uv2nix already builds every wheel with `autoPatchelfHook` and the manylinux
+policy libs for its platform tag, and tags it `passthru.format = "wheel"`. So
+there is **no name allowlist**: `lib/base-overlay.nix` keys off that format flag
+and applies `lib/patch.nix` to *every* wheel — adding libstdc++/zlib (for wheels
+not covered by a manylinux tag) and, under `cuda`, the host driver runpath plus
+`autoPatchelfIgnoreMissingDeps` (sibling `nvidia-*` wheels resolve at runtime).
+CPU builds stay strict so a genuinely missing dep fails loudly.
 
-- `cuda.nix` — `nvidia-*` CUDA runtime wheels (shared GPU base)
-- `torch.nix` — PyTorch ecosystem
-- `pyg.nix` — PyTorch Geometric C-extensions (torch-scatter/-sparse/-cluster/-spline-conv/pyg-lib)
-- `jax.nix` — JAX + its `jax-cuda*` plugin wheels
-- `rapids.nix` — cudf/cugraph/rmm/raft/ucxx/kvikio family
-- `wheels.nix` — generic binary wheels (numpy/scipy/numba/cupy), with per-package
-  extra buildInputs
+`lib/extra-inputs.nix` is the only per-package knowledge — a short exact-name
+attrset of native libs autoPatchelf can't infer (e.g. `numba -> tbb`). Keep this
+list small and broadly reusable. For a single project-specific package, use that
+project's `overrides` (reference it by attr name) rather than extending this
+table. `overrides` is not a uv2nix-env abstraction; it is the standard
+uv2nix/pyproject-nix escape hatch passed through by `mkWorkspace`.
 
-To support a new stack, add `overlays/<name>.nix` and list it in
-`concernModules` (`lib/mk-workspace.nix`). Matchers are name-based — prefer
-specific roots over bare generic words to avoid false positives (harmless no-ops,
-but noise). These fixups are generic ML/CUDA — not bioinformatics-specific;
-bio-only patches would go in a future `overlays/bio.nix`.
+To support a new broadly useful native wheel gap, first check whether it is:
+
+1. a missing build/runtime library that many projects will hit → add an
+   exact-name entry to `lib/extra-inputs.nix`;
+2. a package-specific build quirk → keep it in that project's `overrides`;
+3. a standalone CLI/tool dependency → package it outside the Python env.
+
+These fixups are generic wheel/CUDA mechanics — not bioinformatics-specific.
 
 ## Self-check
 

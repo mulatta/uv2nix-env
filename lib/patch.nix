@@ -3,14 +3,14 @@
   pkgs,
   cuda ? false,
 }:
-# Shared fixup applied by every overlay: autoPatchelf a prebuilt binary wheel,
-# add the usual native libs, and — under CUDA — append the host driver's lib dir
-# so libcuda.so resolves at runtime.
+# Augment a uv2nix-built wheel. uv2nix already adds autoPatchelfHook and
+# manylinux policy libs; this adds libstdc++/zlib for non-manylinux wheels plus
+# any explicit extra inputs. CUDA mode is lenient for sibling nvidia-* wheels and
+# adds the host driver's libcuda.so runpath; CPU mode stays strict.
 drv: extraBuildInputs:
 drv.overrideAttrs (
   old:
   {
-    nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ pkgs.autoPatchelfHook ];
     buildInputs =
       (old.buildInputs or [ ])
       ++ [
@@ -18,10 +18,9 @@ drv.overrideAttrs (
         pkgs.zlib
       ]
       ++ extraBuildInputs;
-    # Sibling CUDA wheels / dlopen'd plugins resolve at runtime, not build time.
-    autoPatchelfIgnoreMissingDeps = [ "*" ];
   }
   // lib.optionalAttrs cuda {
+    autoPatchelfIgnoreMissingDeps = [ "*" ];
     appendRunpaths = [ "${pkgs.addDriverRunpath.driverLink}/lib" ];
   }
 )
