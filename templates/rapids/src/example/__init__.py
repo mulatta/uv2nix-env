@@ -1,1 +1,2 @@
-x = 1
+def main() -> None:
+    print("uv2nix-env template OK")

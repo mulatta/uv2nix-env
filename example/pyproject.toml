@@ -7,6 +7,9 @@ requires-python = ">=3.11"
 # (overrides.nix), while staying CPU-only and fast.
 dependencies = ["numpy>=2"]
 
+[project.scripts]
+example = "example:main"
+
 # uv_build handles editable installs natively (hatchling would also need the
 # `editables` build dep); matches uv2nix's own templates.
 [build-system]

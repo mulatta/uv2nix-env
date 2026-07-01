@@ -4,4 +4,4 @@
 def main() -> None:
     import numpy  # noqa: F401  (binary wheel -> exercises the autoPatchelf override)
 
-    print("bioinformatics-py-overrides example env OK")
+    print("uv2nix-env example env OK")
