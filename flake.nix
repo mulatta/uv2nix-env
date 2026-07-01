@@ -115,6 +115,7 @@
             inherit pkgs;
             workspaceRoot = ./example;
             name = "example-venv";
+            mainProgram = "example";
           };
         in
         {
@@ -122,7 +123,7 @@
         }
         // exampleWorkspace.venvs {
           example-mainprogram = {
-            mainProgram = "python";
+            mainProgram = "example";
           };
         }
       );
@@ -147,7 +148,36 @@
                 mainProgram = self.packages.${system}.example-mainprogram.meta.mainProgram or "";
               }
               ''
-                test "$mainProgram" = python
+                test "$mainProgram" = example
+                touch "$out"
+              '';
+        }
+        // nixpkgs.lib.optionalAttrs (system == "x86_64-linux") {
+          cuda-template-eval =
+            let
+              cudaPkgs = import nixpkgs {
+                inherit system;
+                config.allowUnfree = true;
+              };
+              cudaTemplateDrv =
+                template:
+                (mkWorkspace {
+                  pkgs = cudaPkgs;
+                  workspaceRoot = ./templates/${template};
+                  name = "${template}-template";
+                  cuda = true;
+                }).venv.drvPath;
+            in
+            pkgs.runCommand "cuda-template-eval-check"
+              {
+                torchDrv = builtins.unsafeDiscardStringContext (cudaTemplateDrv "torch");
+                jaxDrv = builtins.unsafeDiscardStringContext (cudaTemplateDrv "jax");
+                rapidsDrv = builtins.unsafeDiscardStringContext (cudaTemplateDrv "rapids");
+              }
+              ''
+                test -n "$torchDrv"
+                test -n "$jaxDrv"
+                test -n "$rapidsDrv"
                 touch "$out"
               '';
         }

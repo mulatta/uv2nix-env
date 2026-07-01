@@ -11,6 +11,7 @@
         inherit system;
         workspaceRoot = ./.;
         cuda = true;
+        mainProgram = "example";
       };
     in
     {

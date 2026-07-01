@@ -7,3 +7,6 @@ dependencies = ["cudf-cu12"]
 [build-system]
 requires = ["uv_build>=0.11"]
 build-backend = "uv_build"
+
+[project.scripts]
+example = "example:main"

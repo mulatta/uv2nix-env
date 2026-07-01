@@ -37,7 +37,7 @@ let
     args:
     let
       venvName = args.name or name;
-      venvExtras = toSpec (args.extras or extras);
+      venvExtras = toSpec (args.extras or (args.deps or extras));
       editable = args.editable or false;
       venvMainProgram = args.mainProgram or mainProgram;
     in
@@ -49,12 +49,14 @@ let
       )
     );
 
-  # { <name> = <extras>; } or { <name> = { extras = …; mainProgram = …; }; }.
+  # { <name> = <extras>; } or
+  # { <name> = { deps = …; extras = …; mainProgram = …; }; }.
   venvs = builtins.mapAttrs (
     venvName: venvSpec:
     mkVenv (
       if
-        builtins.isAttrs venvSpec && (venvSpec ? extras || venvSpec ? editable || venvSpec ? mainProgram)
+        builtins.isAttrs venvSpec
+        && (venvSpec ? deps || venvSpec ? extras || venvSpec ? editable || venvSpec ? mainProgram)
       then
         { name = venvName; } // venvSpec
       else

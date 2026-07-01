@@ -37,7 +37,8 @@ draws is `import` vs. run:
 - `ws.venvs { <name> = <extras>; … }` → `{ <name> = <venv>; … }` — build many
   named variants at once, for a project that ships several optional-dependency
   combinations from one `uv.lock`. Values may also be attrsets such as
-  `{ extras = [ "gpu" ]; mainProgram = "my-cli"; }`.
+  `{ deps = [ "gpu" ]; mainProgram = "my-cli"; }`; use `deps = { pkg = [ … ]; }`
+  for multi-package workspaces to avoid ambiguity with variant options.
 - `ws.mkDevShell { extras ? <all>; name ? …; env ? {}; shellHook ? ""; nativeLibs ? []; packages ? []; }`
   — an editable dev shell over selected extras (omit `extras` for the full
   closure, like `ws.devShell`). Standard uv/`REPO_ROOT` wiring and an
@@ -54,7 +55,9 @@ draws is `import` vs. run:
 All builders accept either `pkgs` or `system` (with `system`, `pkgs` is built
 from this flake's nixpkgs with `allowUnfree`). So a project needs **only the
 `uv2nix-env` input** — `uv2nix`/`pyproject-nix`/`pyproject-build-systems` are
-inherited transitively.
+inherited transitively. CUDA builds default to lenient missing-dependency
+handling for sibling NVIDIA wheels; pass `cudaIgnoredMissingDeps = [ ];` for
+strict auto-patchelf, or a narrower list for project policy.
 
 ## Performance and API caveats
 
@@ -92,8 +95,8 @@ nix flake init -t github:mulatta/uv2nix-env#jax       # JAX + CUDA (+ dm-haiku)
 nix flake init -t github:mulatta/uv2nix-env#rapids    # RAPIDS cudf + CUDA
 ```
 
-Then `uv add <deps>` / `uv lock`, and `nix build` (venv) or `nix develop`
-(editable devShell).
+Then `uv add <deps>` / `uv lock`, and `nix build` (venv), `nix run` (template
+example CLI), or `nix develop` (editable devShell).
 
 ## Usage in a project
 
@@ -109,6 +112,7 @@ Then `uv add <deps>` / `uv lock`, and `nix build` (venv) or `nix develop`
         system = "x86_64-linux";
         workspaceRoot = ./.; # pyproject.toml + uv.lock
         cuda = true;
+        mainProgram = "my-cli"; # optional; enables nix run .#default
         # project-specific long-tail patches, if any:
         overrides = _final: _prev: { };
       };
@@ -126,6 +130,23 @@ fixups are inherited from here.
 > Editable dev shells (`devShell`) need a build backend that supports editable
 > installs natively — **`uv_build`** is recommended (hatchling additionally needs
 > the `editables` build dep). The pure `venv` works with any backend.
+
+## CUDA strictness and executable wrapping
+
+With `cuda = true`, uv2nix-env wraps all executable files in the venv's `bin/`
+directory with the CUDA wheel library directories and host driver path in
+`LD_LIBRARY_PATH`. This covers direct `python` use and console scripts selected
+with `mainProgram`.
+
+CUDA mode also keeps historical lenient auto-patchelf behavior by default:
+
+```nix
+cudaIgnoredMissingDeps = [ "*" ];
+```
+
+Set it to `[ ]` to fail on every unresolved NEEDED entry, or to a narrower list
+when a project knows exactly which CUDA/driver references are expected to resolve
+at runtime.
 
 ## How the fixup works
 
@@ -161,8 +182,9 @@ build actually exercises the autoPatchelf override path, while staying CPU-only:
 
 ```bash
 nix flake check
-nix build .#example && ./result/bin/python -c "import numpy; print('ok')"
+nix run .#example
 ```
 
-Note: this does not exercise the CUDA/torch fixups (no GPU wheels); those are
-validated by real projects that set `cuda = true`.
+Note: the self-check evaluates the CUDA templates, but does not build the full
+CUDA/torch closures. GPU wheel builds remain validated by real projects that set
+`cuda = true`.

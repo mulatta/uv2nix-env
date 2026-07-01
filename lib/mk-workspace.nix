@@ -12,13 +12,14 @@
   # Pass `pkgs` to share a project's own nixpkgs (ideally follows uv2nix-env/nixpkgs),
   # or `system` to build it here with allowUnfree on for CUDA.
   system ? null,
-  pkgs ? import nixpkgs {
-    inherit system;
-    config.allowUnfree = true;
-  },
+  pkgs ? null,
   workspaceRoot,
-  python ? pkgs.python312,
+  python ? null,
   cuda ? false,
+  # CUDA wheels often have sibling-wheel or driver-library references that are
+  # resolved at runtime. The default preserves historical lenient behavior;
+  # pass [ ] to keep autoPatchelf strict, or a narrower list for project policy.
+  cudaIgnoredMissingDeps ? [ "*" ],
   sourcePreference ? "wheel",
   overrides ? (_final: _prev: { }),
   name ? "venv",
@@ -30,18 +31,31 @@
   mainProgram ? null,
 }:
 let
+  pkgs' =
+    if pkgs != null then
+      pkgs
+    else if system != null then
+      import nixpkgs {
+        inherit system;
+        config.allowUnfree = true;
+      }
+    else
+      throw "uv2nix-env.mkWorkspace: pass either `pkgs` or `system`";
+  python' = if python != null then python else pkgs'.python312;
+
   workspace = uv2nix.lib.workspace.loadWorkspace { inherit workspaceRoot; };
   workspaceOverlay = workspace.mkPyprojectOverlay { inherit sourcePreference; };
 
-  pythonSet = (pkgs.callPackage pyproject-nix.build.packages { inherit python; }).overrideScope (
+  pythonSet = (pkgs'.callPackage pyproject-nix.build.packages { python = python'; }).overrideScope (
     lib.composeManyExtensions [
       pyproject-build-systems.overlays.default
       workspaceOverlay
       # Universal wheel fixup (keyed off uv2nix's passthru.format), plus the
       # short exact-name table of per-package native libs. No name allowlist.
       (import ./base-overlay.nix {
-        inherit lib pkgs cuda;
-        extraInputs = import ./extra-inputs.nix { inherit pkgs; };
+        inherit lib cuda cudaIgnoredMissingDeps;
+        pkgs = pkgs';
+        extraInputs = import ./extra-inputs.nix { pkgs = pkgs'; };
       })
       overrides
     ]
@@ -52,22 +66,32 @@ let
     workspace.mkEditablePyprojectOverlay { root = "$REPO_ROOT"; }
   );
 
-  wrapCuda = import ./wrap-cuda.nix { inherit pkgs cuda; };
-
-  builders = import ./builders.nix { inherit lib pkgs; } {
-    inherit
-      workspace
-      pythonSet
-      editableSet
-      wrapCuda
-      name
-      extras
-      mainProgram
-      ;
+  wrapCuda = import ./wrap-cuda.nix {
+    pkgs = pkgs';
+    inherit cuda;
   };
+
+  builders =
+    import ./builders.nix
+      {
+        inherit lib;
+        pkgs = pkgs';
+      }
+      {
+        inherit
+          workspace
+          pythonSet
+          editableSet
+          wrapCuda
+          name
+          extras
+          mainProgram
+          ;
+      };
 in
 {
-  inherit workspace pythonSet python;
+  inherit workspace pythonSet;
+  python = python';
   inherit (builders)
     venv
     mkVenv
