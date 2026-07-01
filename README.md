@@ -29,12 +29,15 @@ draws is `import` vs. run:
   (`{ pkg = [ "gpu" ]; }`) — to select optional-dependencies for `venv`. extras
   are `//`-merged over the default closure, so a listed package's extras
   **replace** its defaults (building `[ "esm" ]` drops a `test` group baked into
-  the default closure; pass `[ "esm" "test" ]` to keep it).
-- `ws.mkVenv { name ? …; extras ? …; editable ? false; }` — build one further
-  venv from the same loaded workspace.
+  the default closure; pass `[ "esm" "test" ]` to keep it). Pass
+  `mainProgram` to set `meta.mainProgram` on the default `venv`.
+- `ws.mkVenv { name ? …; extras ? …; editable ? false; mainProgram ? null; }` —
+  build one further venv from the same loaded workspace. `mainProgram` sets
+  `meta.mainProgram`, so package outputs can be run with `nix run .#pkg`.
 - `ws.venvs { <name> = <extras>; … }` → `{ <name> = <venv>; … }` — build many
   named variants at once, for a project that ships several optional-dependency
-  combinations from one `uv.lock`.
+  combinations from one `uv.lock`. Values may also be attrsets such as
+  `{ extras = [ "gpu" ]; mainProgram = "my-cli"; }`.
 - `ws.mkDevShell { extras ? <all>; name ? …; env ? {}; shellHook ? ""; nativeLibs ? []; packages ? []; }`
   — an editable dev shell over selected extras (omit `extras` for the full
   closure, like `ws.devShell`). Standard uv/`REPO_ROOT` wiring and an
@@ -52,6 +55,31 @@ All builders accept either `pkgs` or `system` (with `system`, `pkgs` is built
 from this flake's nixpkgs with `allowUnfree`). So a project needs **only the
 `uv2nix-env` input** — `uv2nix`/`pyproject-nix`/`pyproject-build-systems` are
 inherited transitively.
+
+## Performance and API caveats
+
+`mkWorkspace` is the expensive boundary: it loads `uv.lock`, builds the
+`pyproject-nix` package set, and composes build-system, workspace, native-wheel,
+and project override overlays. Call it once per project/system/python/CUDA tuple,
+then derive variants with `ws.mkVenv` or `ws.venvs`; repeated `mkWorkspace` calls
+repeat that evaluation work.
+
+The thin helpers (`mkVenv`, `venvs`, `mainProgram`) add negligible evaluation
+cost compared with constructing the package set. Use them freely to keep variants
+sharing one resolved workspace.
+
+`ws.devShell` intentionally defaults to the full `workspace.deps.all` closure.
+For large projects, or projects with optional extras that are slow or broken to
+build, prefer `ws.mkDevShell { extras = [ … ]; }` so the shell only includes the
+extras you need.
+
+In consumer flakes, make shared inputs follow the consumer's pins to avoid lock
+or nixpkgs duplication, for example:
+
+```nix
+inputs.uv2nix-env.inputs.nixpkgs.follows = "nixpkgs";
+inputs.uv2nix-env.inputs.treefmt-nix.follows = "treefmt-nix";
+```
 
 ## Quick start (templates)
 

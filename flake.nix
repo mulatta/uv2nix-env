@@ -110,11 +110,19 @@
       # End-to-end self-check: build the example workspace's venv.
       packages = eachSystem (
         { pkgs, ... }:
-        {
-          example = mkPyEnv {
+        let
+          exampleWorkspace = mkWorkspace {
             inherit pkgs;
             workspaceRoot = ./example;
             name = "example-venv";
+          };
+        in
+        {
+          example = exampleWorkspace.venv;
+        }
+        // exampleWorkspace.venvs {
+          example-mainprogram = {
+            mainProgram = "python";
           };
         }
       );
@@ -129,10 +137,19 @@
       );
 
       checks = eachSystem (
-        { system, ... }:
+        { pkgs, system, ... }:
         {
           formatting = treefmtEval.${system}.config.build.check self;
           example = self.packages.${system}.example;
+          example-mainprogram =
+            pkgs.runCommand "example-mainprogram-check"
+              {
+                mainProgram = self.packages.${system}.example-mainprogram.meta.mainProgram or "";
+              }
+              ''
+                test "$mainProgram" = python
+                touch "$out"
+              '';
         }
       );
 
