@@ -26,6 +26,8 @@
   # Shallow-merged (`//`) over the default closure: a listed package's extras
   # REPLACE its defaults, not union — give the full list to keep them.
   extras ? { },
+  # Optional `meta.mainProgram` for the default venv, enabling `nix run .#pkg`.
+  mainProgram ? null,
 }:
 let
   workspace = uv2nix.lib.workspace.loadWorkspace { inherit workspaceRoot; };
@@ -60,6 +62,7 @@ let
       wrapCuda
       name
       extras
+      mainProgram
       ;
   };
 in

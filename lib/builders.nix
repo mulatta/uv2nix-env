@@ -10,6 +10,7 @@
   wrapCuda,
   name,
   extras,
+  mainProgram,
 }:
 let
   # A bare extras list targets the workspace's root package; an attrset
@@ -17,29 +18,51 @@ let
   rootName = builtins.head (builtins.attrNames workspace.deps.default);
   toSpec = e: if builtins.isAttrs e then e else { ${rootName} = e; };
 
+  withMainProgram =
+    program: drv:
+    if program == null then
+      drv
+    else
+      drv.overrideAttrs (old: {
+        meta = (old.meta or { }) // {
+          mainProgram = program;
+        };
+      });
+
   # `extras` (list for root pkg, or attrset per pkg) is `//`-merged over the
   # default closure, so a listed package's extras REPLACE its defaults, not union.
-  # `editable` swaps in the $REPO_ROOT set.
+  # `editable` swaps in the $REPO_ROOT set. `mainProgram` sets meta.mainProgram
+  # for `nix run .#pkg`.
   mkVenv =
     args:
     let
       venvName = args.name or name;
       venvExtras = toSpec (args.extras or extras);
       editable = args.editable or false;
+      venvMainProgram = args.mainProgram or mainProgram;
     in
-    wrapCuda (
-      (if editable then editableSet else pythonSet).mkVirtualEnv venvName (
-        workspace.deps.default // venvExtras
+    withMainProgram venvMainProgram (
+      wrapCuda (
+        (if editable then editableSet else pythonSet).mkVirtualEnv venvName (
+          workspace.deps.default // venvExtras
+        )
       )
     );
 
-  # { <name> = <extras>; } -> { <name> = <venv>; }.
+  # { <name> = <extras>; } or { <name> = { extras = …; mainProgram = …; }; }.
   venvs = builtins.mapAttrs (
-    venvName: venvExtras:
-    mkVenv {
-      name = venvName;
-      extras = venvExtras;
-    }
+    venvName: venvSpec:
+    mkVenv (
+      if
+        builtins.isAttrs venvSpec && (venvSpec ? extras || venvSpec ? editable || venvSpec ? mainProgram)
+      then
+        { name = venvName; } // venvSpec
+      else
+        {
+          name = venvName;
+          extras = venvSpec;
+        }
+    )
   );
 
   venv = mkVenv { };
